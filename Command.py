@@ -160,13 +160,12 @@ class Cat:
                 file = open(filename, 'r')
             except IOError:
                 print('cat: ' + filename + ': No such file')
-                raise Exception()
             else:
                 outstream = io.StringIO()
                 with file:
                     for line in file:
                         print(line, file=outstream, end='')
-                return outstream
+            return outstream
 
 
 class Pwd:
@@ -193,14 +192,12 @@ class Echo:
         print(file=outstream, end='\n')
         return outstream
 
-#from docopt import docopt
 class Grep:
-    def __init__(self, arguments=None, instream=None):
-        #arguments = docopt(__doc__)
-        print(arguments)
-        self.input_stream = instream
-        self.arguments = arguments
+    def __init__(self, args=None, instreams=None, clarguments=None):
+        self.input_stream = instreams
+        self.arguments = args
         self.keys = ["-i", "-w", "-A"]
+        self.clargs = clarguments
 
     def print_lines(self, i, line, outstream, text_for_search, n=None):
         print(line, file=outstream, end='')
@@ -227,7 +224,7 @@ class Grep:
                     if re.search(pattern, line):
                         self.print_lines(j, line, outstream, text, n)
             except Exception:
-                raise Exception
+                pass
         return outstream
 
     def parse_input_string(self):
@@ -274,8 +271,14 @@ class Grep:
             n, remaining_arguments
 
     def execute(self):
-        flag_i, flag_w, n, args = self.parse_input_string()
-        text = []
+        if self.clargs is None:
+            flag_i, flag_w, n, args = self.parse_input_string()
+            text = []
+        else:
+            flag_i, flag_w, n = self.clargs['-i'], self.clargs['-w'], self.clargs['-A']
+            args = [self.clargs['<pattern>'], self.clargs['<file>']]
+            text = []
+
 
         if len(args) == 0:
             print("There is no template")
@@ -291,19 +294,23 @@ class Grep:
         elif len(args) == 2:
             template = args[0]
             filename = args[1]
-            with open(filename, 'r') as f:
+            try:
+                f = open('1.txt','r')
                 for line in f:
                     text.append(line)
+                f.close()
+            except Exception:
+                print(filename + ': No such file')
 
         else:
             print("Too many arguments")
-            raise Exception
+            return
 
         self.input_stream.close()
         try:
             return self.grep(template, text, flag_i, flag_w, n)
         except Exception:
-            raise Exception
+            return
 
 
 class ShellProcess:
@@ -332,7 +339,7 @@ class ShellProcess:
                                                   shell_arguments],
                                                  universal_newlines=True)
         except subprocess.CalledProcessError:
-            raise Exception
+             return
         else:
             print(output, file=outstream, end='')
         return outstream
