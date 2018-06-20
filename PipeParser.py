@@ -21,13 +21,9 @@ class PipeParser:
         :param input_stream: входящий поток
         :return: поток с результатом данного пайпа
         """
-        if arguments is None:
-            command = self.var_parser.set_values(command)
-            command_name = command[0].text
-        else:
-            command_name = 'grep'
-            command = ['empty']
 
+        command = self.var_parser.set_values(command)
+        command_name = command[0].text
         if command_name in self.__commands:
 
             if command_name == 'echo':
@@ -43,14 +39,14 @@ class PipeParser:
             elif command_name == 'cd':
                 new_command = Command.Cd(command[1:], input_stream)
             elif command_name == 'grep':
-                new_command = Command.Grep(args=command[1:], instreams=input_stream, clarguments=arguments)
+                new_command = Command.Grep(command[1:], input_stream, arguments=arguments)
             else:
                 new_command = Command.Cat(command[1:], input_stream)
 
             try:
                 return new_command.execute()
             except Exception:
-                return
+                raise Exception
 
         else:
             if (command[0].text.find('=') > 0
@@ -61,7 +57,7 @@ class PipeParser:
                     self.var_parser.parse(command)
                 except Exception:
                     print(command[1].txt + ' :command  not found')
-                    return
+                    raise Exception
                 outstream = io.StringIO()
                 return outstream
             else:
@@ -70,4 +66,4 @@ class PipeParser:
                     return command_name.execute()
                 except Exception:
                     print("Command or arguments are wrong")
-                    return
+                    raise Exception
