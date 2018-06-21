@@ -67,11 +67,6 @@ class Ls:
                     outstream.close()
                     raise exp.InterpreterException(('ls: cannot access: {}: '
                           'No such file or directory.'.format(dir)))
-                    # print('ls: cannot access: {}: '
-                    #       'No such file or directory.'.format(dir),
-                    #       file=outstream, end=os.linesep)
-                    #
-                    # return outstream
                 lists_of_files.update({dir: dirlist})
         plur = (len(lists_of_files) > 1)
         for (directory, files) in lists_of_files.items():
