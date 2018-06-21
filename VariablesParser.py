@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import Exception as exp
 
 class VarParser:
     """
@@ -23,7 +23,7 @@ class VarParser:
             if not command[1]:
                 value = ''
             else:
-                raise Exception
+                raise exp.InterpreterException(command[1].txt + ' :command  not found')
         else:
             value = command[0].text[eq_index+1:]
         self.__variables[var] = value

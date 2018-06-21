@@ -3,6 +3,7 @@
 import PipeParser as pp
 import Token as tk
 from sys import stdin
+import Exception as exp
 
 
 def div_by_quotes(tokens_list, text):
@@ -61,8 +62,7 @@ def div_by_quotes(tokens_list, text):
                 tokens_list.append([])
 
     if is_quoting or is_double_quoting:
-        print('non-closed bracket')
-        raise Exception
+        exp.InterpreterException('non-closed bracket')
 
     words = text[begin_text:].split()
     for word in words:
@@ -73,9 +73,10 @@ def div_by_quotes(tokens_list, text):
 
 class Interpreter(object):
 
-    def __init__(self, arguments = None):
+    def __init__(self, arguments=None):
         self.__pipe_parser = pp.PipeParser()
         self.arguments = arguments
+        self.__pipes_list = []
 
     class Stream(object):
         """
@@ -97,10 +98,7 @@ class Interpreter(object):
         то есть по "|"
         :param text:
         """
-        try:
-            self.__pipes_list = div_by_quotes([[]], text)
-        except Exception:
-            raise Exception
+        self.__pipes_list = div_by_quotes([[]], text)
 
     def parse_pipe(self):
         """
@@ -110,18 +108,13 @@ class Interpreter(object):
         :return результат всего пайплайна
         """
         input_stream = self.Stream()
-        if not self.arguments is None:
-            try:
-                input_stream = self.__pipe_parser.parse(None, input_stream, self.arguments)
-            except Exception:
-                return
-        else:
+        if self.__pipes_list != []:
             for part_pipe in self.__pipes_list:
-                try:
-                    input_stream = self.__pipe_parser.parse(part_pipe, input_stream)
-                except Exception:
-                    return
+                input_stream = self.__pipe_parser.parse(part_pipe, input_stream)
+        else:
+            input_stream = self.__pipe_parser.parse(None, input_stream, self.arguments)
 
-        result = input_stream.getvalue()
-        input_stream.close()
-        return result
+        if input_stream:
+            result = input_stream.getvalue()
+            input_stream.close()
+            return result

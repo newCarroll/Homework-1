@@ -6,6 +6,7 @@ import subprocess
 import os
 import io
 import re
+import Exception as exp
 
 
 class Exit:
@@ -27,8 +28,7 @@ class Cd:
         if len(self.arguments) == 0 and self.input_stream.getvalue():
             return outstream
         elif len(self.arguments) > 1:
-            print('cd: too many arguments.')
-            raise Exception()
+            raise exp.InterpreterException('cd: too many arguments.')
         else:
             new_directory = Path(self.arguments[0].text)
         if len(self.arguments) == 0:
@@ -36,7 +36,8 @@ class Cd:
         if new_directory.is_dir():
             os.chdir(new_directory)
         else:
-            print('cd: {}: Not a directory.'.format(new_directory))
+            outstream.close()
+            raise exp.InterpreterException('cd: {}: Not a directory.'.format(new_directory))
         return outstream
 
 
@@ -63,11 +64,14 @@ class Ls:
                 try:
                     dirlist = os.listdir(dir)
                 except Exception:
-                    print('ls: cannot access: {}: '
-                          'No such file or directory.'.format(dir),
-                          file=outstream, end=os.linesep)
-
-                    return outstream
+                    outstream.close()
+                    raise exp.InterpreterException(('ls: cannot access: {}: '
+                          'No such file or directory.'.format(dir)))
+                    # print('ls: cannot access: {}: '
+                    #       'No such file or directory.'.format(dir),
+                    #       file=outstream, end=os.linesep)
+                    #
+                    # return outstream
                 lists_of_files.update({dir: dirlist})
         plur = (len(lists_of_files) > 1)
         for (directory, files) in lists_of_files.items():
@@ -116,8 +120,8 @@ class Wc:
             try:
                 file = open(filename, 'r')
             except IOError:
-                print('wc: ' + filename + ': No such file')
-                raise Exception()
+                self.input_stream.close()
+                raise exp.InterpreterException('wc: ' + filename + ': No such file')
             else:
                 with file:
                     count_line = 0
@@ -159,14 +163,14 @@ class Cat:
             try:
                 file = open(filename, 'r')
             except IOError:
-                print('cat: ' + filename + ': No such file')
-                raise Exception()
+                self.input_stream.close()
+                raise exp.InterpreterException('cat: ' + filename + ': No such file')
             else:
                 outstream = io.StringIO()
                 with file:
                     for line in file:
                         print(line, file=outstream, end='')
-                return outstream
+            return outstream
 
 
 class Pwd:
@@ -193,41 +197,36 @@ class Echo:
         print(file=outstream, end='\n')
         return outstream
 
-#from docopt import docopt
 class Grep:
-    def __init__(self, arguments=None, instream=None):
-        #arguments = docopt(__doc__)
-        print(arguments)
-        self.input_stream = instream
-        self.arguments = arguments
+    def __init__(self, args=None, instreams=None, clarguments=None):
+        self.input_stream = instreams
+        self.arguments = args
         self.keys = ["-i", "-w", "-A"]
+        self.clargs = clarguments
 
     def print_lines(self, i, line, outstream, text_for_search, n=None):
         print(line, file=outstream, end='')
         if n is not None:
             n = int(n)
             if n < 0:
-                print('n must be non-negative')
-                raise Exception
+                outstream.close()
+                raise exp.InterpreterException('n must be non-negative')
 
             for added_line in text_for_search[i + 1:min(len(text_for_search), i + n + 1)]:
                 print(added_line, file=outstream, end='')
 
     def grep(self, pattern, text, i=False, w=False, n=None):
-        
+
         outstream = io.StringIO()
         for j, line in enumerate(text):
             if w:
                 pattern = r'\b' + pattern + r'\b'
-            try:
-                if i:
-                    if re.search(pattern, line, re.IGNORECASE):
-                        self.print_lines(j, line, outstream, text, n)
-                else:
-                    if re.search(pattern, line):
-                        self.print_lines(j, line, outstream, text, n)
-            except Exception:
-                raise Exception
+            if i:
+                if re.search(pattern, line, re.IGNORECASE):
+                    self.print_lines(j, line, outstream, text, n)
+            else:
+                if re.search(pattern, line):
+                    self.print_lines(j, line, outstream, text, n)
         return outstream
 
     def parse_input_string(self):
@@ -241,8 +240,7 @@ class Grep:
 
         # всегда есть хоть 1 аргумент - шаблон
         if len(self.arguments) == 0:
-            print("Error: no input template")
-            raise Exception
+            raise exp.InterpreterException("Error: no input template")
 
         for i, arg in enumerate(self.arguments):
             if arg.text in self.keys:
@@ -251,16 +249,14 @@ class Grep:
                         pos_a = i
                     input_keys.append(arg.text)
                 else:
-                    print("All keys must be before template (and file)")
-                    raise Exception
+                    raise exp.InterpreterException("All keys must be before template (and file)")
 
             else:
                 if pos_a != -1 and i == pos_a + 1:
                     if arg.text.isdigit():
                         n = int(arg.text)
                     else:
-                        print("-A requires int n")
-                        raise Exception
+                        raise exp.InterpreterException("-A requires int n")
                 else:
                     is_parsing_keys = False
                     remaining_arguments.append(arg.text)
@@ -274,36 +270,43 @@ class Grep:
             n, remaining_arguments
 
     def execute(self):
-        flag_i, flag_w, n, args = self.parse_input_string()
-        text = []
+        if self.clargs is None:
+            flag_i, flag_w, n, args = self.parse_input_string()
+            text = []
+        else:
+            flag_i, flag_w, n = self.clargs['-i'], self.clargs['-w'], self.clargs['-A']
+            args = [self.clargs['<pattern>'], self.clargs['<file>']]
+            text = []
+
 
         if len(args) == 0:
-            print("There is no template")
-            raise Exception
+            self.input_stream.close()
+            raise exp.InterpreterException("There is no template")
 
         if len(args) == 1:
             stream_value = self.input_stream.getvalue()
+            self.input_stream.close()
             lines = stream_value.split('\n')
             for line in lines:
                 text.append(line + '\n')
             template = args[0]
 
         elif len(args) == 2:
+            self.input_stream.close()
             template = args[0]
             filename = args[1]
-            with open(filename, 'r') as f:
+            try:
+                f = open(filename,'r')
                 for line in f:
                     text.append(line)
+                f.close()
+            except Exception:
+                raise exp.InterpreterException(filename + ': No such file')
 
         else:
-            print("Too many arguments")
-            raise Exception
+            raise exp.InterpreterException("Too many arguments")
 
-        self.input_stream.close()
-        try:
-            return self.grep(template, text, flag_i, flag_w, n)
-        except Exception:
-            raise Exception
+        return self.grep(template, text, flag_i, flag_w, n)
 
 
 class ShellProcess:
@@ -323,6 +326,7 @@ class ShellProcess:
         if len(self.arguments) > 0:
             shell_arguments += self.arguments[-1].text
         outstream = io.StringIO()
+
         try:
             if shell_arguments == '':
                 output = subprocess.check_output([self.command],
@@ -331,8 +335,8 @@ class ShellProcess:
                 output = subprocess.check_output([self.command,
                                                   shell_arguments],
                                                  universal_newlines=True)
-        except subprocess.CalledProcessError:
-            raise Exception
-        else:
             print(output, file=outstream, end='')
-        return outstream
+            return outstream
+        except Exception:
+            outstream.close()
+            raise exp.InterpreterException("Command or arguments are wrong")

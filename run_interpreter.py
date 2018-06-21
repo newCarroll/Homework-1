@@ -6,7 +6,6 @@ Usage:
   run_interpreter.py grep [-i] [-w] [-A=<n>] <pattern>  <file>
   run_interpreter.py (-h | --help)
   run_interpreter.py
-  run_interpreter.py echo <text>
 
 Options:
   -h --help     Show this screen. Command string takes only grep command.
@@ -18,28 +17,33 @@ Options:
 
 import Interpreter as itr
 from docopt import docopt
+import Exception as exp
 
 
-def begin_interpreter(arguments):
+def begin_interpreter(arguments=None):
 
+    interpreter = itr.Interpreter(arguments)
     if arguments['grep']:
-        interpreter = itr.Interpreter(arguments)
-        result = interpreter.parse_pipe()
-        if result:
-            print(result, end='')
-
+        try:
+            result = interpreter.parse_pipe()
+            if result:
+                print(result, end='')
+        except exp.InterpreterException as e:
+            print(e.get_message())
     else:
-        interpreter = itr.Interpreter()
         while True:
             print('interpreter> ', end='')
             text = input()
             if not text:
                 continue
 
-            interpreter.set_text(text)
-            result = interpreter.parse_pipe()
-            if result:
-                print(result, end='')
+            try:
+                interpreter.set_text(text)
+                result = interpreter.parse_pipe()
+                if result:
+                    print(result, end='')
+            except exp.InterpreterException as e:
+                print(e.get_message())
 
 
 if __name__ == '__main__':
